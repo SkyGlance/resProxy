@@ -1,0 +1,29 @@
+功能代理播放器的HTTP请求，拦截协议并转换成UDP，实现弱网加速功能
+
+//启动中间件代理，只能启动一次
+String usernm, //用户名，要求每个用户唯一
+String passwd, //密码是登录业务系统后返回的session
+long vodport, //点播代理端口，设置播放器代理地址 http://127.0.0.1:vodport
+long liveport, //直播代理端口, 设置播放器代理地址 http://127.0.0.1:liveport
+
+CallLogInterface call //日志调用接口，需要实现，非空
+{
+	OnError(code string, reason string) //错误日志回调
+	OnLog(code string, reason string) //其他日志回调
+}
+
+public static native long StartProxy(String usernm, String passwd, long vodport,long liveport, CallLogInterface call);
+
+
+//重新设置中间件用户名和密码(登录业务系统后返回的session)
+public static native long ResetProxy(String usernm, String passwd);
+
+
+//获取直播代理地址
+public static native String GetLiveProxyAddress();
+
+
+//获取点播代理地址
+public static native String GetVodProxyAddress();
+
+
