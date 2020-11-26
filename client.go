@@ -437,7 +437,6 @@ func (cp *clientProxy) getWebSocketServers(signKey, url string) (svr []string, e
 	if len(auth) <= 0 {
 		log.Printf("user login error,name:%s passwd:%s", userName, passWord)
 		cp.callLog.OnError("ERR_AUTH_STR", "user authentication error")
-		time.Sleep(15 * time.Second)
 		return
 	}
 	cp.tunLock.Lock()
