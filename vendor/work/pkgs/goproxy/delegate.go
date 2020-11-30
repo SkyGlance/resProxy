@@ -70,6 +70,7 @@ func (h *DefaultDelegate) BeforeRequest(ctx *Context) {}
 func (h *DefaultDelegate) BeforeResponse(ctx *Context, resp *http.Response, err error) {}
 
 func (h *DefaultDelegate) ParentProxy(req *http.Request) (*url.URL, error) {
+	//	return http.ProxyFromEnvironment(req)
 	return nil, nil
 }
 

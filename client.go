@@ -28,7 +28,7 @@ import (
 
 const (
 	webMsgChanSize = 10
-	tunVersion     = "v1.2.0"
+	tunVersion     = "v1.2.1"
 )
 
 // CallLogInterface log interface
@@ -424,6 +424,7 @@ func (cp *clientProxy) getWebSocketServers(signKey, url string) (svr []string, e
 	req.Header.Add("Web-Socket-Password", base64.StdEncoding.EncodeToString([]byte(passWord)))
 	req.Header.Add("Web-Socket-Sign", fmt.Sprintf("%x", keySign[:24]))
 	req.Header.Add("Web-Socket-Uuid", randKey)
+	req.Header.Add("User-Agent", "go-web-socket-client")
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -522,7 +523,7 @@ func (cp *clientProxy) startWebSocketClient(callLog CallLogInterface) {
 				cp.runWebSocketClient(url, signKey, callLog)
 				callLog.OnError("ERR_AUTH_CON_PROXY", fmt.Sprintf("%x", sha1.Sum([]byte(sv))))
 				//		log.Printf("get auth server failed,wait 5s")
-				time.Sleep(time.Duration(3+rand.Int()%10) * time.Second)
+				time.Sleep(time.Duration(10+rand.Int()%10) * time.Second)
 			}
 			//	log.Printf("update auth key failed,wait 5s")
 			time.Sleep(5 * time.Second)
@@ -532,7 +533,7 @@ func (cp *clientProxy) startWebSocketClient(callLog CallLogInterface) {
 
 func (cp *clientProxy) onLiveProxyRequest(w http.ResponseWriter, r *http.Request) bool {
 	cp.callLog.OnLog("LIVE", r.RequestURI)
-	if r.Method != "GET" && r.Method != "PUT" {
+	if r.Method != "GET" && r.Method != "HEAD" {
 		w.WriteHeader(403)
 		w.Write([]byte("forbidden,method not supported\n"))
 		return false
@@ -585,7 +586,7 @@ func (cp *clientProxy) onLiveProxyRequest(w http.ResponseWriter, r *http.Request
 
 func (cp *clientProxy) onVodProxyRequest(w http.ResponseWriter, r *http.Request) bool {
 	cp.callLog.OnLog("VOD", r.RequestURI)
-	if r.Method != "GET" && r.Method != "PUT" {
+	if r.Method != "GET" && r.Method != "HEAD" {
 		w.WriteHeader(403)
 		w.Write([]byte("forbidden,method not supported\n"))
 		return false
