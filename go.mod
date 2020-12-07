@@ -1,4 +1,4 @@
-module secretProxy/resClientProxy
+module secretProxy/resProxy
 
 go 1.12
 

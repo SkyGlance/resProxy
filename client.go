@@ -28,7 +28,7 @@ import (
 
 const (
 	webMsgChanSize = 10
-	tunVersion     = "v1.2.1"
+	tunVersion     = "v1.2.0"
 )
 
 // CallLogInterface log interface
@@ -42,7 +42,6 @@ type clientProxy struct {
 	liveSpeed   int64
 	webClient   *webConn
 	msg         *webMsg
-	tunLock     sync.Mutex
 	authStr     string
 	tunMsgChan  chan *webMsg
 	tunServerIP string
@@ -57,8 +56,9 @@ type clientProxy struct {
 	livePorxy     *goproxy.Proxy
 	liveTunLis    net.Listener
 
-	userName string
-	passWD   string
+	resetChan chan struct{}
+	userName  string
+	passWD    string
 
 	updateURLs []string
 	callLog    CallLogInterface
@@ -287,6 +287,7 @@ func (cp *clientProxy) runWebSocketClient(surl, signKey string, callLog CallLogI
 	clientLock.Lock()
 	userName := cp.userName
 	passWord := cp.passWD
+	cp.resetChan = make(chan struct{})
 	clientLock.Unlock()
 
 	randKey := uuid.New().String()
@@ -345,6 +346,9 @@ func (cp *clientProxy) runWebSocketClient(surl, signKey string, callLog CallLogI
 	lastVodBytes := atomic.LoadInt64(&cp.vodPorxy.DownloadBytes)
 	for {
 		select {
+		case <-cp.resetChan:
+			log.Printf("Tun Reset chan envent")
+			return
 		case msg := <-cp.tunMsgChan:
 			web.writeChan <- msg
 			log.Printf("websocket client tun msg")
@@ -440,9 +444,9 @@ func (cp *clientProxy) getWebSocketServers(signKey, url string) (svr []string, e
 		cp.callLog.OnError("ERR_AUTH_STR", "user authentication error")
 		return
 	}
-	cp.tunLock.Lock()
+	clientLock.Lock()
 	cp.authStr = auth[0]
-	cp.tunLock.Unlock()
+	clientLock.Unlock()
 	log.Printf("update auth complete")
 	buf := make([]byte, res.ContentLength)
 	off := 0
@@ -518,15 +522,36 @@ func (cp *clientProxy) startWebSocketClient(callLog CallLogInterface) {
 				webServers[i], webServers[j] = webServers[j], webServers[i]
 			})
 			for i := 0; i < 20; i++ {
+				bexit := false
+				select {
+				case <-cp.resetChan:
+					bexit = true
+					break
+				default:
+				}
+				if bexit {
+					break
+				}
+
 				sv := webServers[rand.Int()%len(webServers)]
 				url := fmt.Sprintf("wss://%s/api/websocket/connect", sv)
 				cp.runWebSocketClient(url, signKey, callLog)
+
+				select {
+				case <-cp.resetChan:
+					bexit = true
+					break
+				default:
+				}
+				if bexit {
+					break
+				}
 				callLog.OnError("ERR_AUTH_CON_PROXY", fmt.Sprintf("%x", sha1.Sum([]byte(sv))))
 				//		log.Printf("get auth server failed,wait 5s")
 				time.Sleep(time.Duration(10+rand.Int()%10) * time.Second)
 			}
 			//	log.Printf("update auth key failed,wait 5s")
-			time.Sleep(5 * time.Second)
+			time.Sleep(1 * time.Second)
 		}
 	}
 }
@@ -550,15 +575,17 @@ func (cp *clientProxy) onLiveProxyRequest(w http.ResponseWriter, r *http.Request
 	}
 	start := time.Now()
 	auth := ""
+	user := ""
 	for {
 		if time.Since(start) > 30*time.Second {
 			w.WriteHeader(500)
 			return false
 		}
 
-		cp.tunLock.Lock()
+		clientLock.Lock()
 		auth = cp.authStr
-		cp.tunLock.Unlock()
+		user = cp.userName
+		clientLock.Unlock()
 		if len(auth) > 0 {
 			break
 		}
@@ -568,12 +595,12 @@ func (cp *clientProxy) onLiveProxyRequest(w http.ResponseWriter, r *http.Request
 
 	r.Header.Set("Accept", "*/*")
 	timestr := fmt.Sprintf("%d", time.Now().Unix())
-	ss := getDecHashStr() + r.URL.Path + agent[0] + cp.userName + timestr + auth
+	ss := getDecHashStr() + r.URL.Path + agent[0] + user + timestr + auth
 	mac := hmac.New(sha256.New, []byte(auth))
 	mac.Write([]byte(ss))
 	sbyte := mac.Sum(nil)
 	signstr := base62.EncodeToString(sbyte)
-	r.RequestURI = fmt.Sprintf(getDecS3Str(), r.RequestURI, cp.userName, timestr, signstr)
+	r.RequestURI = fmt.Sprintf(getDecS3Str(), r.RequestURI, user, timestr, signstr)
 	//	log.Printf("live url query:%s", r.RequestURI)
 	r.URL, err = url.Parse(r.RequestURI)
 	if err != nil {
@@ -603,15 +630,17 @@ func (cp *clientProxy) onVodProxyRequest(w http.ResponseWriter, r *http.Request)
 	}
 	start := time.Now()
 	auth := ""
+	user := ""
 	for {
 		if time.Since(start) > 30*time.Second {
 			w.WriteHeader(500)
 			return false
 		}
 
-		cp.tunLock.Lock()
+		clientLock.Lock()
 		auth = cp.authStr
-		cp.tunLock.Unlock()
+		user = cp.userName
+		clientLock.Unlock()
 		if len(auth) > 0 {
 			break
 		}
@@ -621,12 +650,12 @@ func (cp *clientProxy) onVodProxyRequest(w http.ResponseWriter, r *http.Request)
 
 	r.Header.Set("Accept", "*/*")
 	timestr := fmt.Sprintf("%d", time.Now().Unix())
-	ss := getDecHashStr() + r.URL.Path + agent[0] + cp.userName + timestr + auth
+	ss := getDecHashStr() + r.URL.Path + agent[0] + user + timestr + auth
 	mac := hmac.New(sha256.New, []byte(auth))
 	mac.Write([]byte(ss))
 	sbyte := mac.Sum(nil)
 	signstr := base62.EncodeToString(sbyte)
-	r.RequestURI = fmt.Sprintf(getDecS2Str(), r.RequestURI, cp.userName, timestr, signstr)
+	r.RequestURI = fmt.Sprintf(getDecS2Str(), r.RequestURI, user, timestr, signstr)
 	//	log.Printf("vod url query:%s", r.RequestURI)
 	r.URL, err = url.Parse(r.RequestURI)
 	if err != nil {
@@ -782,6 +811,24 @@ func GetLiveProxyAddress() string {
 	return fmt.Sprintf("http://127.0.0.1:%d", pclient.livePort)
 }
 
+// ResetProxy reset username passwd
+func ResetProxy(usernm, passwd string) int {
+	clientLock.Lock()
+	if pclient == nil {
+		clientLock.Unlock()
+		return -1
+	}
+	select {
+	case <-pclient.resetChan:
+	default:
+		close(pclient.resetChan)
+	}
+	pclient.userName = usernm
+	pclient.passWD = passwd
+	clientLock.Unlock()
+	return 0
+}
+
 //IsOpened check
 func IsOpened() bool {
 	b := false
@@ -848,6 +895,7 @@ func StartProxy(usernm, passwd string, vodPort, livePort int, call CallLogInterf
 	}()
 
 	client.callLog = call
+	client.resetChan = make(chan struct{})
 	client.userName = usernm
 	client.passWD = passwd
 	pclient = client
