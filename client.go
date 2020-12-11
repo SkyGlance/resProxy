@@ -19,7 +19,9 @@ import (
 	"sync/atomic"
 	"time"
 	"work/pkgs/base62"
+	"work/pkgs/dns"
 	"work/pkgs/goproxy"
+	"work/pkgs/ntp"
 	"work/pkgs/uuid"
 
 	"github.com/gorilla/websocket"
@@ -28,7 +30,7 @@ import (
 
 const (
 	webMsgChanSize = 10
-	tunVersion     = "v1.2.0"
+	tunVersion     = "v1.2.3"
 )
 
 // CallLogInterface log interface
@@ -71,13 +73,53 @@ var (
 		"208.67.222.222:53", "208.67.222.220:53",
 		"1.1.1.1:53", "1.0.0.1:53",
 	}
+	ntpServers = []string{
+		"time.windows.com", "time.google.com",
+		"time.apple.com", "pool.ntp.org",
+		"time.cloudflare.com", "time.nist.gov",
+	}
 
 	httpClient *http.Client
 	tlsConf    *tls.Config
 
 	clientLock sync.Mutex
 	pclient    *clientProxy
+
+	ntpLock   sync.Mutex
+	ntpOffSet int64
 )
+
+func runNTPService() {
+	rand.Seed(time.Now().Unix())
+	for {
+		bok := false
+		rand.Shuffle(len(ntpServers), func(i, j int) {
+			ntpServers[i], ntpServers[j] = ntpServers[j], ntpServers[i]
+		})
+
+		for _, nt := range ntpServers {
+			ips := dns.GetHostsByName(nt)
+			for _, ip := range ips {
+				q, err := ntp.Query(ip)
+				if err != nil {
+					continue
+				}
+				s1 := time.Now().UTC().Unix()
+				s2 := time.Now().UTC().Add(q.ClockOffset).Unix()
+				ntpLock.Lock()
+				ntpOffSet = s2 - s1
+				ntpLock.Unlock()
+				bok = true
+				break
+			}
+			if bok {
+				break
+			}
+			time.Sleep(3 * time.Second)
+		}
+		time.Sleep(600 * time.Second)
+	}
+}
 
 func init() {
 	root := getDecRootCrt()
@@ -162,7 +204,10 @@ func init() {
 			TLSClientConfig:     tlsConf,
 		},
 	}
+
+	go runNTPService()
 }
+
 func (cp *clientProxy) runSpeedTestProc(wc *webConn, ptest *speedTestData) {
 	defer func() {
 		select {
@@ -594,7 +639,13 @@ func (cp *clientProxy) onLiveProxyRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	r.Header.Set("Accept", "*/*")
-	timestr := fmt.Sprintf("%d", time.Now().Unix())
+
+	current := time.Now().UTC().Unix()
+	ntpLock.Lock()
+	current += ntpOffSet
+	ntpLock.Unlock()
+	timestr := fmt.Sprintf("%d", current)
+
 	ss := getDecHashStr() + r.URL.Path + agent[0] + user + timestr + auth
 	mac := hmac.New(sha256.New, []byte(auth))
 	mac.Write([]byte(ss))
@@ -649,7 +700,13 @@ func (cp *clientProxy) onVodProxyRequest(w http.ResponseWriter, r *http.Request)
 	}
 
 	r.Header.Set("Accept", "*/*")
-	timestr := fmt.Sprintf("%d", time.Now().Unix())
+
+	current := time.Now().UTC().Unix()
+	ntpLock.Lock()
+	current += ntpOffSet
+	ntpLock.Unlock()
+	timestr := fmt.Sprintf("%d", current)
+
 	ss := getDecHashStr() + r.URL.Path + agent[0] + user + timestr + auth
 	mac := hmac.New(sha256.New, []byte(auth))
 	mac.Write([]byte(ss))
@@ -747,6 +804,15 @@ var (
 	apiLock sync.Mutex
 	logChan chan logData
 )
+
+//GetCurrentUTCTime api ntp time
+func GetCurrentUTCTime() int64 {
+	ntpLock.Lock()
+	s1 := time.Now().UTC().Unix()
+	s1 += ntpOffSet
+	ntpLock.Unlock()
+	return s1
+}
 
 //GetHostByName api dns-resovler
 func GetHostByName(host string) string {
