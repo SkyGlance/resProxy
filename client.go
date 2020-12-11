@@ -19,7 +19,6 @@ import (
 	"sync/atomic"
 	"time"
 	"work/pkgs/base62"
-	"work/pkgs/dns"
 	"work/pkgs/goproxy"
 	"work/pkgs/ntp"
 	"work/pkgs/uuid"
@@ -30,7 +29,7 @@ import (
 
 const (
 	webMsgChanSize = 10
-	tunVersion     = "v1.2.3"
+	tunVersion     = "v1.2.3-1"
 )
 
 // CallLogInterface log interface
@@ -98,7 +97,7 @@ func runNTPService() {
 		})
 
 		for _, nt := range ntpServers {
-			ips := dns.GetHostsByName(nt)
+			ips := goproxy.GetHostsByName(nt)
 			for _, ip := range ips {
 				q, err := ntp.Query(ip)
 				if err != nil {
