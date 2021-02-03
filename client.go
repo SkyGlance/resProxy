@@ -29,7 +29,7 @@ import (
 
 const (
 	webMsgChanSize = 10
-	tunVersion     = "v1.2.3-1"
+	tunVersion     = "v1.2.4"
 )
 
 // CallLogInterface log interface
@@ -152,7 +152,7 @@ func init() {
 				}
 				//	ips = []string{"127.0.0.1"}
 				host := fmt.Sprintf("%s:%s", ips[rand.Int()%len(ips)], nport)
-				c, err := net.DialTimeout(netw, host, time.Second*10)
+				c, err := net.DialTimeout(netw, host, time.Second*15)
 				if err != nil {
 					return nil, err
 				}
@@ -184,7 +184,7 @@ func init() {
 				}
 				//	ips = []string{"127.0.0.1"}
 				addr = fmt.Sprintf("%s:%s", ips[rand.Int()%len(ips)], nport)
-				c, err := net.DialTimeout(netw, addr, time.Second*10)
+				c, err := net.DialTimeout(netw, addr, time.Second*15)
 				if err != nil {
 					return nil, err
 				}
@@ -321,7 +321,7 @@ func (cp *clientProxy) runWebSocketClient(surl, signKey string, callLog CallLogI
 			}
 			//	ips = []string{"127.0.0.1"}
 			addr = fmt.Sprintf("%s:%s", ips[rand.Int()%len(ips)], nport)
-			c, err := net.DialTimeout(netw, addr, time.Second*10)
+			c, err := net.DialTimeout(netw, addr, time.Second*15)
 			if err != nil {
 				return nil, err
 			}
@@ -495,8 +495,8 @@ func (cp *clientProxy) getWebSocketServers(signKey, url string) (svr []string, e
 	buf := make([]byte, res.ContentLength)
 	off := 0
 	for {
-		n, err := res.Body.Read(buf[off:])
-		if n == 0 && err != nil {
+		n, _ := res.Body.Read(buf[off:])
+		if n <= 0 {
 			break
 		}
 		off += n
