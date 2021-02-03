@@ -472,6 +472,7 @@ func (cp *clientProxy) getWebSocketServers(signKey, url string) (svr []string, e
 	req.Header.Add("Web-Socket-Password", base64.StdEncoding.EncodeToString([]byte(passWord)))
 	req.Header.Add("Web-Socket-Sign", fmt.Sprintf("%x", keySign[:24]))
 	req.Header.Add("Web-Socket-Uuid", randKey)
+	req.Header.Add("Web-Socket-TunVersion", tunVersion)
 	req.Header.Add("User-Agent", "go-web-socket-client")
 
 	res, err := httpClient.Do(req)
