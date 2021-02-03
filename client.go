@@ -190,7 +190,7 @@ func init() {
 				}
 				return c, nil
 			},
-			ResponseHeaderTimeout: 20 * time.Second,
+			ResponseHeaderTimeout: 30 * time.Second,
 			Proxy: func(req *http.Request) (*url.URL, error) {
 				//	return http.ProxyFromEnvironment(req)
 				return nil, nil
@@ -303,7 +303,7 @@ func (cp *clientProxy) runWebSocketClient(surl, signKey string, callLog CallLogI
 
 	dialer := &websocket.Dialer{
 		TLSClientConfig:  tlsConf,
-		HandshakeTimeout: 10 * time.Second,
+		HandshakeTimeout: 30 * time.Second,
 		Proxy: func(req *http.Request) (*url.URL, error) {
 			//	return http.ProxyFromEnvironment(req)
 			return nil, nil
@@ -483,7 +483,7 @@ func (cp *clientProxy) getWebSocketServers(signKey, url string) (svr []string, e
 		return
 	}
 	auth := res.Header["Web-Socket-Auth"]
-	if len(auth) <= 0 {
+	if len(auth) <= 0 || res.ContentLength <= 0 {
 		log.Printf("user login error,name:%s passwd:%s", userName, passWord)
 		cp.callLog.OnError("ERR_AUTH_STR", "user authentication error")
 		return
