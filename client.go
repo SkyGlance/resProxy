@@ -29,7 +29,7 @@ import (
 
 const (
 	webMsgChanSize = 10
-	tunVersion     = "v1.2.4"
+	tunVersion     = "v1.3.0"
 )
 
 // CallLogInterface log interface
@@ -342,7 +342,7 @@ func (cp *clientProxy) runWebSocketClient(surl, signKey string, callLog CallLogI
 	req.Add("Web-Socket-Password", base64.StdEncoding.EncodeToString([]byte(passWord)))
 	req.Add("Web-Socket-Sign", fmt.Sprintf("%x", keySign[:24]))
 	req.Add("Web-Socket-Uuid", randKey)
-	req.Add("Web-Socket-TunVersion", tunVersion)
+	req.Add("Web-Socket-Tunversion", tunVersion)
 	req.Add("User-Agent", "go-web-socket-client")
 
 	conn, res, err := dialer.Dial(surl, req)
@@ -472,7 +472,7 @@ func (cp *clientProxy) getWebSocketServers(signKey, url string) (svr []string, e
 	req.Header.Add("Web-Socket-Password", base64.StdEncoding.EncodeToString([]byte(passWord)))
 	req.Header.Add("Web-Socket-Sign", fmt.Sprintf("%x", keySign[:24]))
 	req.Header.Add("Web-Socket-Uuid", randKey)
-	req.Header.Add("Web-Socket-TunVersion", tunVersion)
+	req.Header.Add("Web-Socket-Tunversion", tunVersion)
 	req.Header.Add("User-Agent", "go-web-socket-client")
 
 	res, err := httpClient.Do(req)
@@ -584,8 +584,8 @@ func (cp *clientProxy) startWebSocketClient(callLog CallLogInterface) {
 				//		log.Printf("get auth server failed,wait 5s")
 				time.Sleep(time.Duration(10+rand.Int()%10) * time.Second)
 			}
-			//	log.Printf("update auth key failed,wait 5s")
-			time.Sleep(1 * time.Second)
+			log.Printf("update auth key failed,wait 5s")
+			time.Sleep(5 * time.Second)
 		}
 	}
 }
@@ -626,9 +626,7 @@ func (cp *clientProxy) onLiveProxyRequest(w http.ResponseWriter, r *http.Request
 		time.Sleep(500 * time.Millisecond)
 		//	log.Printf("live wait for auth")
 	}
-
 	r.Header.Set("Accept", "*/*")
-
 	current := time.Now().UTC().Unix()
 	ntpLock.Lock()
 	current += ntpOffSet
@@ -641,6 +639,7 @@ func (cp *clientProxy) onLiveProxyRequest(w http.ResponseWriter, r *http.Request
 	sbyte := mac.Sum(nil)
 	signstr := base62.EncodeToString(sbyte)
 	r.RequestURI = fmt.Sprintf(getDecS3Str(), r.RequestURI, user, timestr, signstr)
+	r.RequestURI += "&version=" + tunVersion
 	//	log.Printf("live url query:%s", r.RequestURI)
 	r.URL, err = url.Parse(r.RequestURI)
 	if err != nil {
@@ -687,9 +686,7 @@ func (cp *clientProxy) onVodProxyRequest(w http.ResponseWriter, r *http.Request)
 		time.Sleep(500 * time.Millisecond)
 		//	log.Printf("live wait for auth")
 	}
-
 	r.Header.Set("Accept", "*/*")
-
 	current := time.Now().UTC().Unix()
 	ntpLock.Lock()
 	current += ntpOffSet
@@ -702,6 +699,7 @@ func (cp *clientProxy) onVodProxyRequest(w http.ResponseWriter, r *http.Request)
 	sbyte := mac.Sum(nil)
 	signstr := base62.EncodeToString(sbyte)
 	r.RequestURI = fmt.Sprintf(getDecS2Str(), r.RequestURI, user, timestr, signstr)
+	r.RequestURI += "&version=" + tunVersion
 	//	log.Printf("vod url query:%s", r.RequestURI)
 	r.URL, err = url.Parse(r.RequestURI)
 	if err != nil {
