@@ -9,6 +9,7 @@ import (
 	"net/url"
 	resProxy "secretProxy/resProxy"
 	"strings"
+	"time"
 )
 
 var (
@@ -58,5 +59,7 @@ func main() {
 	//	resProxy.PostLogData(`https://vip.magistv.net/api/streamLog/save`,
 	//		`{"applicationId":"com.android.mgandroid","brand":"Android","carrier":"amlogic","country":"CN","hardware":"","lauguage":"zh","loginName":"yang","model":"Aboxx","osversion":"5.1.1","platform":"2","playMsg":"media play state is ready !","playUrl":"http://123.com/EL-CANAL-DE-FUTBOL-ECUADOR-HD/index.m3u8?token=cNyJnqtM9ZmRSqf9grBhx4YdvCCZFEBi8k1qxeJUtx6KvX5Li9AtJWchaMaADaLwiUOI5GAMIMXsKXTv82GEfdA/n3pKM7VDwvHmc765pJbeKYS7mDXC9k3EOHZDOY-yang-yang1591116724364-1591167869556-0.0.0.0","sdk":"22","serial":"7eec2f90576c42a0848fc22b9e0bd9f9","timeZone":"America/Chicago","versionCode":"20600","versionName":"2.6.0_debug"}`)
 	resProxy.StartProxy(user, pass, 19230, 19231, &llog)
+	time.Sleep(30 * time.Second)
+	resProxy.ResetProxy(user, pass)
 	select {}
 }

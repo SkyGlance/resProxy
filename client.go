@@ -567,21 +567,10 @@ func (cp *clientProxy) startWebSocketClient(callLog CallLogInterface) {
 				webServers[i], webServers[j] = webServers[j], webServers[i]
 			})
 			for i := 0; i < 20; i++ {
-				bexit := false
-				select {
-				case <-cp.resetChan:
-					bexit = true
-					break
-				default:
-				}
-				if bexit {
-					break
-				}
-
 				sv := webServers[rand.Int()%len(webServers)]
 				url := fmt.Sprintf("wss://%s/api/websocket/connect", sv)
 				cp.runWebSocketClient(url, signKey, callLog)
-
+				bexit := false
 				select {
 				case <-cp.resetChan:
 					bexit = true
